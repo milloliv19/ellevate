@@ -1,0 +1,4 @@
+networkx>=3.0
+streamlit>=1.28
+streamlit-gsheets-connection>=0.0.1
+requests>=2.28
