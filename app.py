@@ -9,6 +9,9 @@ from streamlit_gsheets import GSheetsConnection
 from match_maker_automated import run_matching_workflow
 import requests
 
+# SET THIS TO TRUE TO TEST WITHOUT CREDENTIALS
+    TEST_MODE = True
+
 st.set_page_config(page_title="Match Maker Control Center", layout="wide")
 st.title("Match Maker Control Center")
 
@@ -18,8 +21,6 @@ st.title("Match Maker Control Center")
 @st.cache_data(ttl=300)
 def load_sheet_data():
     """Load from Sheets, or return Mock Data if testing."""
-    # SET THIS TO TRUE TO TEST WITHOUT CREDENTIALS
-    TEST_MODE = True 
 
     if TEST_MODE:
         mock_participants = pd.DataFrame([
