@@ -16,16 +16,34 @@ st.title("Match Maker Control Center")
 # ---------------------------------------------------------------------------
 @st.cache_data(ttl=300)
 def load_sheet_data():
-    """Load Participants and MatchHistory from Google Sheets."""
+    """Load from Sheets, or return Mock Data if testing."""
+    # SET THIS TO TRUE TO TEST WITHOUT CREDENTIALS
+    TEST_MODE = True 
+
+    if TEST_MODE:
+        mock_participants = pd.DataFrame([
+            {"Name": "Alice Smith", "Email": "alice@test.com", "Include": True},
+            {"Name": "Bob Jones", "Email": "bob@test.com", "Include": True},
+            {"Name": "Charlie Brown", "Email": "charlie@test.com", "Include": True},
+            {"Name": "Diana Prince", "Email": "diana@test.com", "Include": True},
+            {"Name": "Edward Nigma", "Email": "edward@test.com", "Include": True},
+        ])
+        mock_history = pd.DataFrame([
+            {"Person A (Email)": "alice@test.com", "Person B (Email)": "bob@test.com", "Match Date": "2024-01-01"}
+        ])
+        return mock_participants, mock_history
+
+    # Original GSheets logic (runs when TEST_MODE is False)
     conn = st.connection("gsheets", type=GSheetsConnection)
     participants_df = conn.read(worksheet="Participants", ttl=300)
     history_df = conn.read(worksheet="MatchHistory", ttl=300)
     return participants_df, history_df
 
+# This part stays exactly as it was
 try:
     participants_df, history_df = load_sheet_data()
 except Exception as e:
-    st.error(f"Could not load data from Google Sheets. Check your connection and secrets. Error: {e}")
+    st.error(f"Could not load data. Error: {e}")
     st.stop()
 
 # ---------------------------------------------------------------------------
@@ -138,23 +156,60 @@ else:
 # ---------------------------------------------------------------------------
 st.header("4. Push to Tray")
 webhook_url = st.secrets.get("tray_webhook_url") or st.secrets.get("TRAY_WEBHOOK_URL")
-if not webhook_url:
-    st.warning("Add `tray_webhook_url` (or `TRAY_WEBHOOK_URL`) to `.streamlit/secrets.toml` to enable Push to Tray.")
-    webhook_url = ""
 
 if st.button("Push to Tray", type="secondary"):
-    if not webhook_url:
+    if not st.session_state.get("match_results"):
+        st.warning("Please generate matches in Step 2 first.")
+    elif not webhook_url and not TEST_MODE:
         st.error("No Tray webhook URL configured. Add it to secrets.")
-    elif not st.session_state.get("match_results"):
-        st.warning("Generate matches first.")
     else:
-        payload = st.session_state["match_results"]
-        with st.spinner("Sending to Tray…"):
-            try:
-                r = requests.post(webhook_url, json=payload, timeout=30)
-                r.raise_for_status()
-                st.success("Successfully pushed to Tray.")
-            except requests.RequestException as e:
-                st.error(f"Push failed: {e}")
-            except Exception as e:
-                st.error(f"Error: {e}")
+        results = st.session_state["match_results"]
+        
+        # --- PREPARE THE DATA FOR TRAY ---
+        from datetime import datetime
+        today = datetime.now().strftime("%Y-%m-%d")
+        history_updates = []
+
+        for m in results:
+            # 1. Standard Pair (A & B)
+            history_updates.append({
+                "Person A (Email)": m['person_a']['email'],
+                "Person B (Email)": m['person_b']['email'],
+                "Match Date": today
+            })
+            
+            # 2. Handle Triad connections (A-C and B-C)
+            if m['match_type'] == "triad":
+                history_updates.append({
+                    "Person A (Email)": m['person_a']['email'], 
+                    "Person B (Email)": m['person_c']['email'], 
+                    "Match Date": today
+                })
+                history_updates.append({
+                    "Person A (Email)": m['person_b']['email'], 
+                    "Person B (Email)": m['person_c']['email'], 
+                    "Match Date": today
+                })
+
+        # The "Full Payload" contains everything Tray needs
+        full_payload = {
+            "matches": results,           
+            "history_rows": history_updates 
+        }
+
+        if TEST_MODE:
+            st.info("🧪 **Test Mode Active:** Showing JSON payload instead of sending to Tray.")
+            st.json(full_payload)
+            st.code(f"Target URL: {webhook_url if webhook_url else 'None configured'}")
+        else:
+            with st.spinner("Sending to Tray..."):
+                try:
+                    # Send the combined payload
+                    r = requests.post(webhook_url, json=full_payload, timeout=30)
+                    r.raise_for_status()
+                    st.balloons()
+                    st.success("Successfully pushed to Tray! Emails are being sent and history is updating.")
+                except requests.RequestException as e:
+                    st.error(f"Push failed: {e}")
+                except Exception as e:
+                    st.error(f"An unexpected error occurred: {e}")
