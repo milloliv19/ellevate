@@ -3,6 +3,7 @@ Streamlit control center for the matching workflow.
 Credentials: configure in .streamlit/secrets.toml (e.g. connections.gsheets).
 """
 import streamlit as st
+import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 
 from match_maker_automated import run_matching_workflow
