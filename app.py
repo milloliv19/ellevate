@@ -10,7 +10,7 @@ from match_maker_automated import run_matching_workflow
 import requests
 
 # SET THIS TO TRUE TO TEST WITHOUT CREDENTIALS
-    TEST_MODE = True
+TEST_MODE = True
 
 st.set_page_config(page_title="Match Maker Control Center", layout="wide")
 st.title("Match Maker Control Center")
