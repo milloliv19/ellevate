@@ -23,16 +23,27 @@ def load_sheet_data():
     """Load from Sheets, or return Mock Data if testing."""
 
     if TEST_MODE:
-        mock_participants = pd.DataFrame([
-            {"Name": "Alice Smith", "Email": "alice@test.com", "Include": True},
-            {"Name": "Bob Jones", "Email": "bob@test.com", "Include": True},
-            {"Name": "Charlie Brown", "Email": "charlie@test.com", "Include": True},
-            {"Name": "Diana Prince", "Email": "diana@test.com", "Include": True},
-            {"Name": "Edward Nigma", "Email": "edward@test.com", "Include": True},
-        ])
-        mock_history = pd.DataFrame([
-            {"Person A (Email)": "alice@test.com", "Person B (Email)": "bob@test.com", "Match Date": "2024-01-01"}
-        ])
+        # Same format as Google Sheets: array of arrays (header row + data rows)
+        participants_header = [
+            "Timestamp",
+            "Email Address",
+            "Please provide your preferred first and last name.",
+            "What is your office location?",
+            "Superpower",
+            "Growth Zone",
+        ]
+        participants_rows = [
+            ["1/21/2026 14:55:00", "alice@test.com", "Alice Smith", "London", "Wine Evaluation", "Crochet"],
+            ["1/21/2026 14:56:00", "bob@test.com", "Bob Jones", "London", "Baking", "Running"],
+            ["1/21/2026 14:57:00", "charlie@test.com", "Charlie Brown", "New York", "Juggling", "Reading"],
+            ["1/21/2026 14:58:00", "diana@test.com", "Diana Prince", "London", "Leadership", "Meditation"],
+            ["1/21/2026 14:59:00", "edward@test.com", "Edward Nigma", "Remote", "Puzzles", "Chess"],
+        ]
+        mock_participants = pd.DataFrame(participants_rows, columns=participants_header)
+
+        history_header = ["Person A (Email)", "Person B (Email)", "Match Date"]
+        history_rows = [["alice@test.com", "bob@test.com", "2024-01-01"]]
+        mock_history = pd.DataFrame(history_rows, columns=history_header)
         return mock_participants, mock_history
 
     # Original GSheets logic (runs when TEST_MODE is False)
@@ -53,14 +64,16 @@ except Exception as e:
 # Sheet columns may be 'Email'/'Name' or 'email'/'name'
 # ---------------------------------------------------------------------------
 def normalize_participant_columns(df):
-    """Ensure we have lowercase 'email' and 'name' for the matcher."""
+    """Ensure we have lowercase 'email' and 'name' for the matcher.
+    Handles both short names and Google Form-style headers (Email Address, preferred first and last name).
+    """
     df = df.copy()
     col_map = {}
     for c in df.columns:
         c_lower = str(c).strip().lower()
-        if c_lower == "email":
+        if c_lower in ("email", "email address"):
             col_map[c] = "email"
-        elif c_lower == "name":
+        elif c_lower == "name" or "preferred first and last name" in c_lower:
             col_map[c] = "name"
     df = df.rename(columns=col_map)
     return df
